@@ -27,15 +27,21 @@ struct propozycja {
 	char adres[32];
 };
 
+struct strzal {
+	char strzal[4];
+};
+
 int main(int argc, char *argv[]) {
 	int sockfd;
 	struct sockaddr_in server_addr;
 	ssize_t bytes;
 	int pid;
 	int my_port = 6767;
+	short myTurn = 0;
 
 	struct gracz ja, przeciwnik;
 	struct propozycja propMy;
+	struct strzal s, sPrzeciwnik;
 
 	/* Obsluga bledow */
 	if((argc != 2)&&(argc != 3)) {
@@ -81,11 +87,25 @@ int main(int argc, char *argv[]) {
 		ja.dm[strlen(ja.dm)-1] = '\0';
 		
 		printf("Polozenie Twoich okretow:\nJednomasztowiecA: %s\nJednomasztowiecB: %s\nDwumasztowiec: %s\n", ja.jm1, ja.jm2, ja.dm);
-	
+		
 		bytes = sendto(sockfd, &ja, sizeof(ja), 0, 
 					(struct sockaddr *)&server_addr, sizeof(server_addr));
-		
-		printf(" (%s: %zd bajtow)\n", (bytes > 0)?"OK":"cos nie tak!", bytes);
+
+		if(bytes > 0) {
+			printf("[Wyslano propozycje gry do %s]\n", argv[1]);
+		}
+		else {
+			printf("Nie udalo sie wyslac propozycji gry do %s\n", argv[1]);
+			exit(1);
+		}
+
+		/* Wlasciwa gra */
+		while(8) {
+				myTurn = 0;
+				printf("Wybierz pole do strzalu: ");
+				fgets(s.strzal, 4, stdin);
+				bytes = sendto(sockfd, &s, sizeof(s), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+		}
 	}
 	else {
 		/* PROCES MACIERZYSTY - SERWER */
@@ -100,14 +120,23 @@ int main(int argc, char *argv[]) {
 		/*inet_addr("158.75.112.121"); //juliusz na sztywno */
 		server_addr.sin_port        = htons(my_port);    /* moj port */
 		
-		bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr));
+		bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)); 
 	
-		printf("[Serwer]: Utworzone gniazdo, slucham na porcie: %d\n", my_port); 
-	
+		/* Czekanie na przyjecie propozycji */
 		while(1) {
 			recvfrom(sockfd, &przeciwnik, sizeof(przeciwnik), 0, NULL, NULL);
-			printf("Wiadomosc od %s:\nJednomasztowiecA: %s\nJednomasztowiecB: %s\nDwumasztowiec: %s\n", przeciwnik.nick, przeciwnik.jm1, przeciwnik.jm2, przeciwnik.dm);
+			printf("Propozycja gry przyjeta\n");
+			myTurn = 1;
+			break;
 		}
+
+		/* Wlasciwa gra */
+		while(8) {
+			recvfrom(sockfd, &sPrzeciwnik, sizeof(sPrzeciwnik), 0, NULL, NULL);
+			printf("Przeciwnik strzelil: %s\n", sPrzeciwnik.strzal);
+			myTurn = 1;
+		}
+		printf("Rozpoczynamy gre elo!\n");
 	}
 
 	close(sockfd);
