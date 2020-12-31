@@ -173,8 +173,8 @@ int main(int argc, char *argv[]) {
 
 		/* Wlasciwa gra */
 		while(8) {
-			if(strcmp("Tak", ja->komunikat) == 0) {
-				if(ja->skip == 1) {
+			if((strcmp("Tak", ja->komunikat) == 0)||(strcmp("Skip", ja->komunikat) == 0)) {
+				if(strcmp("Skip", ja->komunikat) == 0) {
 					printf("TEST: faza druga ok\n");
 					strcpy(s.strzal, "NN");
 					s.strzal[strlen(s.strzal)-1] = '\0';
@@ -189,7 +189,7 @@ int main(int argc, char *argv[]) {
 				}
 			}
 			else {
-				while(strcmp("Tak", ja->komunikat) != 0) {
+				while((strcmp("Tak", ja->komunikat) != 0)&&(strcmp("Skip", ja->komunikat) != 0)) {
 					/* Busy waiting - zapobiega problemom przy niegrzecznym zachowaniu */
 				}
 			}
@@ -254,11 +254,10 @@ int main(int argc, char *argv[]) {
 			while(2) {
 				if(strcmp(ja->komunikat, "Ustawione") == 0) {
 					printf("Propozycja gry przyjeta\n");
-					strncpy(ja->komunikat, "Tak", 64);
 					break;
 				}
 			}
-
+			
 			strncpy(ja->komunikat, "Tak", 64);
 
 			break;
@@ -272,7 +271,7 @@ int main(int argc, char *argv[]) {
 			sPrzeciwnik.strzal[strlen(sPrzeciwnik.strzal)-1] = '\0';
 			if(sprawdzTrafienie(sPrzeciwnik.strzal, ja) == 1) {
 				printf("TEST: komunikat = Nastepny\n");
-				ja->skip = 1;
+				strncpy(ja->komunikat, "Skip", 64);
 			}
 			else {
 				strncpy(ja->komunikat, "Tak", 64);
