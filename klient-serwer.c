@@ -44,6 +44,7 @@ int main(int argc, char *argv[]) {
 	ssize_t bytes;
 	int pid;
 	int my_port = 6767;
+	char ignore[64];
 
 	struct gracz ja, przeciwnik;
 	struct propozycja propMy;
@@ -70,6 +71,9 @@ int main(int argc, char *argv[]) {
 		strcpy(propMy.nick, argv[2]);
 	}
 
+	/* Inicjalizacja */
+	turn.myTurn = 2;
+
 	/* Forkowanie */
 	if((pid = fork()) < 0) {
 		printf("Blad funkcji fork\n");
@@ -95,7 +99,6 @@ int main(int argc, char *argv[]) {
 			exit(1);
 		}
 		
-
 		/* przygotowanie adresu serwera */
 		server_addr.sin_family = AF_INET; /* IPv4 */
 		inet_aton(argv[1],&server_addr.sin_addr ); /* 1. argument = adres IP serwera */
@@ -124,8 +127,9 @@ int main(int argc, char *argv[]) {
 					(struct sockaddr *)&server_addr, sizeof(server_addr));
 
 		/* Wysylanie informacji o mojej kolejce */
-		/*if(strncpy(data, "Rival", 64) != 0) {
-			turn.myTurn = 1;
+		/*if(strcmp(data, "Start") == 0) {
+			strncpy(data, "turn1", 64);
+			printf("Zmieniam wartosc na turn1\n");
 			bytes = sendto(sockfd, &turn, sizeof(turn), 0, (struct sockaddr*)&server_addr, sizeof(server_addr)); 
 		} */
 		
@@ -144,6 +148,11 @@ int main(int argc, char *argv[]) {
 				fgets(s.strzal, 4, stdin);
 				bytes = sendto(sockfd, &s, sizeof(s), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
 				strncpy(data, "Nie", 64);
+			}
+			else {
+				while(strcmp("Tak", data) != 0) {
+					/* Busy waiting - zapobiega problemom przy niegrzecznym zachowaniu */
+				}
 			}
 		}
 
@@ -181,18 +190,24 @@ int main(int argc, char *argv[]) {
 		
 		bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)); 
 	
+		/*strncpy(data, "Start", 64); */
+
 		/* Odbieranie informacji o kolejce przeciwnika */
 		/*while(1) {
 			/* turn.myTurn == 1 -> moja kolej, nie czekamy na pakiet od przeciwnika */
-			/*if(turn.myTurn == 1) {
+			/*if(strcmp(data, "Start")  == 0) {
+				continue;
+			}
+			if(strcmp(data, "turn1") == 0) {
 				break;
-			} */
+				printf("Moja kolej\n");
+			}
 			/* W przeciwnym wypadku - czekamy na pakiet od przeciwnika i ustamy nie nasza kolej */
 			/*recvfrom(sockfd, &turn, sizeof(turn), 0, NULL, NULL);
-			turn.myTurn = 0;
-			strncpy(data, "Rival", 64);
+			strncpy(data, "turn0", 64);
+			printf("Kolej przeciwnika\n");
 			break;
-		} */
+		}*/
 
 		/* Czekanie na przyjecie propozycji */
 		while(1) {
@@ -200,6 +215,7 @@ int main(int argc, char *argv[]) {
 			while(2) {
 				if(strcmp(data, "Ustawione") == 0) {
 					printf("Propozycja gry przyjeta\n");
+					strncpy(data, "Tak", 64);
 					break;
 				}
 			}
