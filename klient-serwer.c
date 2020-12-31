@@ -60,7 +60,7 @@ short sprawdzTrafienie(char *traf, struct gracz* ja) {
 		printf("Trafiony dwumasztowiec\n");
 	}
 	else {
-		if(strcmp(traf, "N") != 0) {
+		if(strcmp(traf, "NN") != 0) {
 			printf("Pudlo\n");
 		}
 		else {
@@ -175,7 +175,6 @@ int main(int argc, char *argv[]) {
 		while(8) {
 			if((strcmp("Tak", ja->komunikat) == 0)||(strcmp("Skip", ja->komunikat) == 0)) {
 				if(strcmp("Skip", ja->komunikat) == 0) {
-					printf("TEST: faza druga ok\n");
 					strncpy(s.strzal, "NN", 3);
 					bytes = sendto(sockfd, &s, sizeof(s), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
 					strncpy(ja->komunikat, "Nie", 64);
@@ -267,11 +266,10 @@ int main(int argc, char *argv[]) {
 			recvfrom(sockfd, &sPrzeciwnik, sizeof(sPrzeciwnik), 0, NULL, NULL);
 			if(strcmp(sPrzeciwnik.strzal, "NN") != 0) {
 				printf("Przeciwnik strzelil: %s\n", sPrzeciwnik.strzal);
+				sPrzeciwnik.strzal[strlen(sPrzeciwnik.strzal)-1] = '\0';
 			}
 			
-			sPrzeciwnik.strzal[strlen(sPrzeciwnik.strzal)-1] = '\0';
 			if(sprawdzTrafienie(sPrzeciwnik.strzal, ja) == 1) {
-				printf("TEST: komunikat = Nastepny\n");
 				strncpy(ja->komunikat, "Skip", 64);
 			}
 			else {
