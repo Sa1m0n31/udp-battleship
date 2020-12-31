@@ -7,6 +7,9 @@
 #include<unistd.h>
 #include<string.h>
 
+#include<sys/ipc.h>
+#include<sys/shm.h>
+
 /* Kod na podstawie przykladu ,,A. Mroz - zad. na SK, do modyfikacji'' */
 /* bez pelnej obslugi bledow! */
 
@@ -31,17 +34,25 @@ struct strzal {
 	char strzal[4];
 };
 
+struct myTurn {
+	int myTurn;
+};
+
 int main(int argc, char *argv[]) {
 	int sockfd;
 	struct sockaddr_in server_addr;
 	ssize_t bytes;
 	int pid;
 	int my_port = 6767;
-	short myTurn = 0;
 
 	struct gracz ja, przeciwnik;
 	struct propozycja propMy;
 	struct strzal s, sPrzeciwnik;
+	struct myTurn turn;
+
+	key_t key;
+	int shmid;
+	char *data;
 
 	/* Obsluga bledow */
 	if((argc != 2)&&(argc != 3)) {
@@ -67,6 +78,24 @@ int main(int argc, char *argv[]) {
 	else if(pid == 0) {
 		/* PROCES POTOMNY - KLIENT */
 		
+		/* Przygotowanie kolejki komunikatow */
+		if((key = ftok("plik", 'R')) == -1) {
+			printf("Blad funkcji ftok\n");
+			exit(1);
+		}
+
+		if((shmid = shmget(key, 64, 0644 | IPC_CREAT)) == -1) {
+			printf("Blad funkcji shmget\n");
+			exit(1);
+		}
+
+		data = shmat(shmid, (void*)0, 0);
+		if(data == (char*)(-1)) {
+			printf("Blad funkcji shmat\n");
+			exit(1);
+		}
+		
+
 		/* przygotowanie adresu serwera */
 		server_addr.sin_family = AF_INET; /* IPv4 */
 		inet_aton(argv[1],&server_addr.sin_addr ); /* 1. argument = adres IP serwera */
@@ -88,9 +117,18 @@ int main(int argc, char *argv[]) {
 		
 		printf("Polozenie Twoich okretow:\nJednomasztowiecA: %s\nJednomasztowiecB: %s\nDwumasztowiec: %s\n", ja.jm1, ja.jm2, ja.dm);
 		
+		strncpy(data, "Ustawione", 64);
+
+		/* Wyslanie propozycji gry */
 		bytes = sendto(sockfd, &ja, sizeof(ja), 0, 
 					(struct sockaddr *)&server_addr, sizeof(server_addr));
 
+		/* Wysylanie informacji o mojej kolejce */
+		/*if(strncpy(data, "Rival", 64) != 0) {
+			turn.myTurn = 1;
+			bytes = sendto(sockfd, &turn, sizeof(turn), 0, (struct sockaddr*)&server_addr, sizeof(server_addr)); 
+		} */
+		
 		if(bytes > 0) {
 			printf("[Wyslano propozycje gry do %s]\n", argv[1]);
 		}
@@ -101,15 +139,36 @@ int main(int argc, char *argv[]) {
 
 		/* Wlasciwa gra */
 		while(8) {
-				myTurn = 0;
+			if(strcmp("Tak", data) == 0) {
 				printf("Wybierz pole do strzalu: ");
 				fgets(s.strzal, 4, stdin);
 				bytes = sendto(sockfd, &s, sizeof(s), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+				strncpy(data, "Nie", 64);
+			}
 		}
+
+		shmdt(data);
 	}
 	else {
 		/* PROCES MACIERZYSTY - SERWER */
-	
+
+		/* Przygotowanie kolejki komunikatow */
+		if((key = ftok("plik", 'R')) == -1) {
+			printf("Blad funkcji ftok\n");
+			exit(1);
+		}
+
+		if((shmid = shmget(key, 64, 0644 | IPC_CREAT)) == -1) {
+			printf("Blad funkcji shmget\n");
+			exit(1);
+		}
+
+		data = shmat(shmid, (void*)0, 0);
+		if(data == (char*)(-1)) {
+			printf("Blad funkcji shmat\n");
+			exit(1);
+		}
+		
 		/* tworze gniazdo - na razie tylko czesc "protokol" */
 		sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 	
@@ -122,11 +181,31 @@ int main(int argc, char *argv[]) {
 		
 		bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)); 
 	
+		/* Odbieranie informacji o kolejce przeciwnika */
+		/*while(1) {
+			/* turn.myTurn == 1 -> moja kolej, nie czekamy na pakiet od przeciwnika */
+			/*if(turn.myTurn == 1) {
+				break;
+			} */
+			/* W przeciwnym wypadku - czekamy na pakiet od przeciwnika i ustamy nie nasza kolej */
+			/*recvfrom(sockfd, &turn, sizeof(turn), 0, NULL, NULL);
+			turn.myTurn = 0;
+			strncpy(data, "Rival", 64);
+			break;
+		} */
+
 		/* Czekanie na przyjecie propozycji */
 		while(1) {
 			recvfrom(sockfd, &przeciwnik, sizeof(przeciwnik), 0, NULL, NULL);
-			printf("Propozycja gry przyjeta\n");
-			myTurn = 1;
+			while(2) {
+				if(strcmp(data, "Ustawione") == 0) {
+					printf("Propozycja gry przyjeta\n");
+					break;
+				}
+			}
+
+			strncpy(data, "Tak", 64);
+
 			break;
 		}
 
@@ -134,9 +213,12 @@ int main(int argc, char *argv[]) {
 		while(8) {
 			recvfrom(sockfd, &sPrzeciwnik, sizeof(sPrzeciwnik), 0, NULL, NULL);
 			printf("Przeciwnik strzelil: %s\n", sPrzeciwnik.strzal);
-			myTurn = 1;
+			
+			strncpy(data, "Tak", 64);
 		}
 		printf("Rozpoczynamy gre elo!\n");
+		
+		shmdt(data);
 	}
 
 	close(sockfd);
