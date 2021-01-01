@@ -5,6 +5,7 @@
 #include<netinet/in.h>
 #include<arpa/inet.h>
 #include<unistd.h>
+#include<signal.h>
 #include<string.h>
 
 #include<sys/ipc.h>
@@ -38,7 +39,7 @@ struct propozycja {
 };
 
 struct strzal {
-	char strzal[4];
+	char strzal[10];
 };
 
 struct myTurn {
@@ -70,6 +71,15 @@ short sprawdzTrafienie(char *traf, struct gracz* ja) {
 	}
 
 	return trafiony;
+}
+
+void wypisz() {
+	
+}
+
+void koniecGry(pid_t pid, pid_t ppid) {
+	printf("Gra zostala zakonczona, zabijam procesy o id: %d i %d\n", pid, ppid);
+	exit(1);
 }
 
 int main(int argc, char *argv[]) {
@@ -175,6 +185,8 @@ int main(int argc, char *argv[]) {
 			exit(1);
 		}
 
+		printf("My PID is: %d\n", getpid());
+
 		/* Wlasciwa gra */
 		while(8) {
 			if((strcmp("Tak", ja->komunikat) == 0)||(strcmp("Skip", ja->komunikat) == 0)) {
@@ -185,9 +197,21 @@ int main(int argc, char *argv[]) {
 				}
 				else {
 					printf("Wybierz pole do strzalu: ");
-					fgets(s.strzal, 4, stdin);
-					bytes = sendto(sockfd, &s, sizeof(s), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-					strncpy(ja->komunikat, "Nie", 64);
+					fgets(s.strzal, 10, stdin);
+					s.strzal[strlen(s.strzal)-1] = '\0';
+
+					if(strcmp(s.strzal, "<koniec>") == 0) {
+						printf("KONCZE PROGRAM\\n");
+						break;
+					}
+					else if(strcmp(s.strzal, "wypisz") == 0) {
+						wypisz();
+						continue;
+					}
+					else {
+						bytes = sendto(sockfd, &s, sizeof(s), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+						strncpy(ja->komunikat, "Nie", 64);
+					}
 				}
 			}
 			else {
@@ -250,6 +274,8 @@ int main(int argc, char *argv[]) {
 			break;
 		}*/
 
+		printf("My PID is: %d\n", getpid());
+
 		/* Czekanie na przyjecie propozycji */
 		while(1) {
 			recvfrom(sockfd, &przeciwnik, sizeof(przeciwnik), 0, NULL, NULL);
@@ -270,7 +296,6 @@ int main(int argc, char *argv[]) {
 			recvfrom(sockfd, &sPrzeciwnik, sizeof(sPrzeciwnik), 0, NULL, NULL);
 			if(strcmp(sPrzeciwnik.strzal, "NN") != 0) {
 				printf("Przeciwnik strzelil: %s\n", sPrzeciwnik.strzal);
-				sPrzeciwnik.strzal[strlen(sPrzeciwnik.strzal)-1] = '\0';
 			}
 			
 			if(sprawdzTrafienie(sPrzeciwnik.strzal, ja) == 1) {
