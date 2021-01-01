@@ -82,26 +82,13 @@ int main(int argc, char *argv[]) {
 
 	struct propozycja propMy;
 	struct strzal s, sPrzeciwnik;
-	struct gracz *ja, przeciwnik;
+	struct gracz *ja = (struct gracz*)malloc(sizeof(struct gracz)), przeciwnik;
 
 	key_t key;
 	int shmid;
 
-	/* Obsluga bledow */
-	if((argc != 2)&&(argc != 3)) {
-		printf("Podaj jeden lub dwa argumenty programu!\n");
-		exit(1);
-	}
-	else if(argc == 2) {
-		/* Nie podano nicku - ustawienie domyslnego nicku */
-		strcpy(ja->nick, "NN");
-		strcpy(propMy.nick, "NN");
-	}
-	else {
-		/* Podano nick - ustawienie nicku podanego jako drugi argument */
-		strcpy(ja->nick, argv[2]);
-		strcpy(propMy.nick, argv[2]);
-	}
+	/* Inicjalizacja struktury gracz - ja */
+	/*ja = (struct gracz*)malloc(sizeof(*ja));*/
 
 	/* Forkowanie */
 	if((pid = fork()) < 0) {
@@ -127,6 +114,23 @@ int main(int argc, char *argv[]) {
 			printf("Blad funkcji shmat\n");
 			exit(1);
 		}
+
+		/* Obsluga bledow */
+		if((argc != 2)&&(argc != 3)) {
+			printf("Podaj jeden lub dwa argumenty programu!\n");
+			exit(1);
+		}
+		else if(argc == 2) {
+			/* Nie podano nicku - ustawienie domyslnego nicku */
+			strcpy(ja->nick, "NN");
+			strcpy(propMy.nick, "NN");
+		}
+		else {
+			/* Podano nick - ustawienie nicku podanego jako drugi argument */
+			strcpy(ja->nick, argv[2]);
+			strcpy(propMy.nick, argv[2]);
+		}
+
 		
 		/* przygotowanie adresu serwera */
 		server_addr.sin_family = AF_INET; /* IPv4 */
@@ -281,6 +285,7 @@ int main(int argc, char *argv[]) {
 		shmdt(ja);
 	}
 
+	free(ja);
 	close(sockfd);
 	return 0;
 }
