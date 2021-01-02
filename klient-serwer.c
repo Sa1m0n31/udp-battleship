@@ -17,6 +17,13 @@
 int shmid;
 key_t key;
 
+int sockfd;
+struct sockaddr_in server_addr;
+ssize_t bytes;
+struct gracz *ja;
+int my_port = 6767;
+char tmp[10];
+
 struct my_msg{
     char name[16];
     char text[255];
@@ -76,11 +83,6 @@ void wypisz() {
 	
 }
 
-void koniecGry(pid_t pid, pid_t ppid) {
-	printf("Gra zostala zakonczona, zabijam procesy o id: %d i %d\n", pid, ppid);
-	exit(1);
-}
-
 void endClient() {
 	if(shmctl(shmid, IPC_RMID, 0) != 0) {
 		printf("Problem z usunieciem pamieci dzielonej\n");
@@ -101,18 +103,53 @@ void endServer() {
 
 }
 
+void start(struct gracz *ja, char *host) {
+	/* przygotowanie adresu serwera */
+	server_addr.sin_family = AF_INET; /* IPv4 */
+	inet_aton(host,&server_addr.sin_addr); /* 1. argument = adres IP serwera */
+	server_addr.sin_port = htons(my_port); /* port 6767 */
+	
+	/* towrze gniazdo - na razie tylko czesc "protokol" */
+	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+	
+	/* Komunikacja */
+	printf("Czesc %s, podaj polozenie swoich okretow:\n1. Jednomasztowiec:", ja->nick);
+	fgets(ja->jm1, 4, stdin);
+	ja->jm1[strlen(ja->jm1)-1] = '\0';
+	printf("2. Jednomasztowiec: ");
+	fgets(ja->jm2, 4, stdin);
+	ja->jm2[strlen(ja->jm2)-1] = '\0';
+	printf("3. Dwumasztowiec: ");
+	fgets(tmp, 8, stdin);
+	strncpy(ja->dm1, &tmp[strlen(tmp)-3], 2);
+	strncpy(ja->dm2, tmp, 2);
+	
+	printf("Polozenie Twoich okretow:\nJednomasztowiecA: %s\nJednomasztowiecB: %s\nDwumasztowiec: %s %s\n", ja->jm1, ja->jm2, ja->dm1, ja->dm2);
+		
+	strncpy(ja->komunikat, "Ustawione", 64);
+
+	/* Wyslanie propozycji gry */
+	bytes = sendto(sockfd, &ja, sizeof(ja), 0, 
+				(struct sockaddr *)&server_addr, sizeof(server_addr));
+
+	if(bytes > 0) {
+		printf("[Wyslano propozycje gry do %s]\n", host);
+	}
+	else {
+		printf("Nie udalo sie wyslac propozycji gry do %s\n", host);
+		exit(1);
+	}
+}
+
 int main(int argc, char *argv[]) {
-	int sockfd;
-	struct sockaddr_in server_addr;
-	ssize_t bytes;
 	int pid;
-	int my_port = 6767;
-	char tmp[10];
 	char decision;
 
 	struct propozycja propMy;
 	struct strzal s, sPrzeciwnik;
-	struct gracz *ja = (struct gracz*)malloc(sizeof(struct gracz)), przeciwnik;
+	struct gracz przeciwnik;
+
+	ja = (struct gracz*)malloc(sizeof(struct gracz));
 
 	/* Inicjalizacja struktury gracz - ja */
 	/*ja = (struct gracz*)malloc(sizeof(*ja));*/
@@ -160,50 +197,8 @@ int main(int argc, char *argv[]) {
 			strcpy(ja->nick, argv[2]);
 			strcpy(propMy.nick, argv[2]);
 		}
-
 		
-		/* przygotowanie adresu serwera */
-		server_addr.sin_family = AF_INET; /* IPv4 */
-		inet_aton(argv[1],&server_addr.sin_addr); /* 1. argument = adres IP serwera */
-		server_addr.sin_port = htons(my_port); /* port 6767 */
-	
-		/* towrze gniazdo - na razie tylko czesc "protokol" */
-		sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-	
-		/* Komunikacja */
-		printf("Czesc %s, podaj polozenie swoich okretow:\n1. Jednomasztowiec:", ja->nick);
-		fgets(ja->jm1, 4, stdin);
-		ja->jm1[strlen(ja->jm1)-1] = '\0';
-		printf("2. Jednomasztowiec: ");
-		fgets(ja->jm2, 4, stdin);
-		ja->jm2[strlen(ja->jm2)-1] = '\0';
-		printf("3. Dwumasztowiec: ");
-		fgets(tmp, 8, stdin);
-		strncpy(ja->dm1, &tmp[strlen(tmp)-3], 2);
-		strncpy(ja->dm2, tmp, 2);
-		
-		printf("Polozenie Twoich okretow:\nJednomasztowiecA: %s\nJednomasztowiecB: %s\nDwumasztowiec: %s %s\n", ja->jm1, ja->jm2, ja->dm1, ja->dm2);
-		
-		strncpy(ja->komunikat, "Ustawione", 64);
-
-		/* Wyslanie propozycji gry */
-		bytes = sendto(sockfd, &ja, sizeof(ja), 0, 
-					(struct sockaddr *)&server_addr, sizeof(server_addr));
-
-		/* Wysylanie informacji o mojej kolejce */
-		/*if(strcmp(data, "Start") == 0) {
-			strncpy(data, "turn1", 64);
-			printf("Zmieniam wartosc na turn1\n");
-			bytes = sendto(sockfd, &turn, sizeof(turn), 0, (struct sockaddr*)&server_addr, sizeof(server_addr)); 
-		} */
-		
-		if(bytes > 0) {
-			printf("[Wyslano propozycje gry do %s]\n", argv[1]);
-		}
-		else {
-			printf("Nie udalo sie wyslac propozycji gry do %s\n", argv[1]);
-			exit(1);
-		}
+		start(ja, argv[1]);
 
 		/* Wlasciwa gra */
 		while(8) {
@@ -218,7 +213,7 @@ int main(int argc, char *argv[]) {
 					s.strzal[strlen(s.strzal)-1] = '\0';
 
 					if(strcmp(s.strzal, "<koniec>") == 0) {
-						printf("KONCZE PROGRAM\\n");
+						printf("Zakonczyles gre\n");
 						strncpy(s.strzal, "KK", 3);
 						bytes = sendto(sockfd, &s, sizeof(s), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
 						shmdt(ja);
@@ -234,6 +229,9 @@ int main(int argc, char *argv[]) {
 						bytes = sendto(sockfd, &s, sizeof(s), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
 						strncpy(ja->komunikat, "Nie", 64);
 					}
+				}
+				else if(strcmp("Nowa", ja->komunikat) == 0) {
+					start(ja, argv[1]);
 				}
 		}
 
@@ -273,27 +271,6 @@ int main(int argc, char *argv[]) {
 		server_addr.sin_port        = htons(my_port);    /* moj port */
 		
 		bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)); 
-	
-		/*strncpy(data, "Start", 64); */
-
-		/* Odbieranie informacji o kolejce przeciwnika */
-		/*while(1) {
-			/* turn.myTurn == 1 -> moja kolej, nie czekamy na pakiet od przeciwnika */
-			/*if(strcmp(data, "Start")  == 0) {
-				continue;
-			}
-			if(strcmp(data, "turn1") == 0) {
-				break;
-				printf("Moja kolej\n");
-			}
-			/* W przeciwnym wypadku - czekamy na pakiet od przeciwnika i ustamy nie nasza kolej */
-			/*recvfrom(sockfd, &turn, sizeof(turn), 0, NULL, NULL);
-			strncpy(data, "turn0", 64);
-			printf("Kolej przeciwnika\n");
-			break;
-		}*/
-
-		printf("My PID is: %d\n", getpid());
 
 		/* Czekanie na przyjecie propozycji */
 		while(1) {
@@ -324,6 +301,9 @@ int main(int argc, char *argv[]) {
 					kill(pid, SIGINT); /* Zabijanie dziecka */
 					exit(0);
 				}
+				else {
+					strncpy(ja->komunikat, "Nowa",  64);
+				}
 			}
 			
 			if(sprawdzTrafienie(sPrzeciwnik.strzal, ja) == 1) {
@@ -333,7 +313,7 @@ int main(int argc, char *argv[]) {
 				strncpy(ja->komunikat, "Tak", 64);
 			}
 		}
-		printf("Rozpoczynamy gre elo!\n");
+		printf("Tu start jakby...\n");
 		
 		shmdt(ja);
 	}
