@@ -89,6 +89,7 @@ int main(int argc, char *argv[]) {
 	int pid;
 	int my_port = 6767;
 	char tmp[10];
+	char decision;
 
 	struct propozycja propMy;
 	struct strzal s, sPrzeciwnik;
@@ -199,6 +200,10 @@ int main(int argc, char *argv[]) {
 
 					if(strcmp(s.strzal, "<koniec>") == 0) {
 						printf("KONCZE PROGRAM\\n");
+						strncpy(s.strzal, "KK", 3);
+						bytes = sendto(sockfd, &s, sizeof(s), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+						kill(getppid(), SIGINT);
+						kill(getpid(), SIGINT);
 						break;
 					}
 					else if(strcmp(s.strzal, "wypisz") == 0) {
@@ -285,8 +290,16 @@ int main(int argc, char *argv[]) {
 		/* Wlasciwa gra */
 		while(8) {
 			recvfrom(sockfd, &sPrzeciwnik, sizeof(sPrzeciwnik), 0, NULL, NULL);
-			if(strcmp(sPrzeciwnik.strzal, "NN") != 0) {
+			if((strcmp(sPrzeciwnik.strzal, "NN") != 0)&&(strcmp(sPrzeciwnik.strzal, "KK") != 0)) {
 				printf("Przeciwnik strzelil: %s\n", sPrzeciwnik.strzal);
+			}
+			else if(strcmp(sPrzeciwnik.strzal, "KK") == 0) {
+				printf("Przeciwnik zakonczyl gre. Czy chcesz ustawic nowa plansze? (t/n)\n");
+				scanf("%c", &decision);
+				if(decision == 'n') {
+					/* Koniec gry */
+					exit(0);
+				}
 			}
 			
 			if(sprawdzTrafienie(sPrzeciwnik.strzal, ja) == 1) {
