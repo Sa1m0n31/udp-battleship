@@ -149,6 +149,44 @@ void start(struct gracz *ja, char *host) {
 		printf("Nie udalo sie wyslac propozycji gry do %s\n", host);
 		exit(1);
 	}
+
+		/* Wlasciwa gra */	
+		while(8) {
+				if(strcmp("Skip", ja->komunikat) == 0) {
+					strncpy(s.strzal, "NN", 3);
+					bytes = sendto(sockfd, &s, sizeof(s), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+					strncpy(ja->komunikat, "Nie", 64);
+				}
+				else if(strcmp("Tak", ja->komunikat) == 0) {
+					printf("Wybierz pole do strzalu: ");
+					fgets(s.strzal, 10, stdin);
+					s.strzal[strlen(s.strzal)-1] = '\0';
+
+					if(strcmp(s.strzal, "<koniec>") == 0) {
+						printf("Zakonczyles gre\n");
+						strncpy(s.strzal, "KK", 3);
+						bytes = sendto(sockfd, &s, sizeof(s), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+						shmdt(ja);
+						kill(getppid(), SIGINT);
+						kill(getpid(), SIGINT);
+						break;
+					}
+					else if(strcmp(s.strzal, "wypisz") == 0) {
+						wypisz();
+						continue;
+					}
+					else {
+						bytes = sendto(sockfd, &s, sizeof(s), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+						strncpy(ja->komunikat, "Nie", 64);
+					}
+				}
+				else if(strcmp("Nowa", ja->komunikat) == 0) {
+					break;
+				}
+		}
+
+		start(ja, host);
+
 }
 
 void startServer(struct gracz *ja, struct gracz przeciwnik) {
@@ -255,42 +293,9 @@ int main(int argc, char *argv[]) {
 		}
 		
 		strncpy(ja->komunikat, "Nowa", 64);
+		
+		/* GLOWNA FUNKCJA KLIENTA - WYSYLANIE */
 		start(ja, argv[1]);
-
-		/* Wlasciwa gra */
-		while(8) {
-				if(strcmp("Skip", ja->komunikat) == 0) {
-					strncpy(s.strzal, "NN", 3);
-					bytes = sendto(sockfd, &s, sizeof(s), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-					strncpy(ja->komunikat, "Nie", 64);
-				}
-				else if(strcmp("Tak", ja->komunikat) == 0) {
-					printf("Wybierz pole do strzalu: ");
-					fgets(s.strzal, 10, stdin);
-					s.strzal[strlen(s.strzal)-1] = '\0';
-
-					if(strcmp(s.strzal, "<koniec>") == 0) {
-						printf("Zakonczyles gre\n");
-						strncpy(s.strzal, "KK", 3);
-						bytes = sendto(sockfd, &s, sizeof(s), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-						shmdt(ja);
-						kill(getppid(), SIGINT);
-						kill(getpid(), SIGINT);
-						break;
-					}
-					else if(strcmp(s.strzal, "wypisz") == 0) {
-						wypisz();
-						continue;
-					}
-					else {
-						bytes = sendto(sockfd, &s, sizeof(s), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-						strncpy(ja->komunikat, "Nie", 64);
-					}
-				}
-				else if(strcmp("Nowa", ja->komunikat) == 0) {
-					start(ja, argv[1]);
-				}
-		}
 
 		shmdt(ja);
 	}
@@ -329,6 +334,7 @@ int main(int argc, char *argv[]) {
 		
 		bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)); 
 
+		/* GLOWNA FUNKCJE SERWERA - ODBIERANIE */
 		startServer(ja, przeciwnik);
 		
 		shmdt(ja);
