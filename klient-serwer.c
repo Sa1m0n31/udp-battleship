@@ -24,6 +24,10 @@ struct gracz *ja;
 int my_port = 6767;
 char tmp[10];
 
+struct strzal s, sPrzeciwnik;
+char decision;
+int pid;
+
 struct my_msg{
     char name[16];
     char text[255];
@@ -113,18 +117,24 @@ void start(struct gracz *ja, char *host) {
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 	
 	/* Komunikacja */
-	printf("Czesc %s, podaj polozenie swoich okretow:\n1. Jednomasztowiec:", ja->nick);
-	fgets(ja->jm1, 4, stdin);
-	ja->jm1[strlen(ja->jm1)-1] = '\0';
-	printf("2. Jednomasztowiec: ");
-	fgets(ja->jm2, 4, stdin);
-	ja->jm2[strlen(ja->jm2)-1] = '\0';
-	printf("3. Dwumasztowiec: ");
-	fgets(tmp, 8, stdin);
-	strncpy(ja->dm1, &tmp[strlen(tmp)-3], 2);
-	strncpy(ja->dm2, tmp, 2);
 	
-	printf("Polozenie Twoich okretow:\nJednomasztowiecA: %s\nJednomasztowiecB: %s\nDwumasztowiec: %s %s\n", ja->jm1, ja->jm2, ja->dm1, ja->dm2);
+	while(8) {
+		if(strcmp(ja->komunikat, "Nowa") == 0) {
+			printf("Czesc %s, podaj polozenie swoich okretow:\n1. Jednomasztowiec:", ja->nick);
+			fgets(ja->jm1, 4, stdin);
+			ja->jm1[strlen(ja->jm1)-1] = '\0';
+			printf("2. Jednomasztowiec: ");
+			fgets(ja->jm2, 4, stdin);
+			ja->jm2[strlen(ja->jm2)-1] = '\0';
+			printf("3. Dwumasztowiec: ");
+			fgets(tmp, 8, stdin);
+			strncpy(ja->dm1, &tmp[strlen(tmp)-3], 2);
+			strncpy(ja->dm2, tmp, 2);
+	
+			printf("Polozenie Twoich okretow:\nJednomasztowiecA: %s\nJednomasztowiecB: %s\nDwumasztowiec: %s %s\n", ja->jm1, ja->jm2, ja->dm1, ja->dm2);		
+			break;
+		}
+	}
 		
 	strncpy(ja->komunikat, "Ustawione", 64);
 
@@ -141,12 +151,58 @@ void start(struct gracz *ja, char *host) {
 	}
 }
 
-int main(int argc, char *argv[]) {
-	int pid;
-	char decision;
+void startServer(struct gracz *ja, struct gracz przeciwnik) {
+	/* Czekanie na przyjecie propozycji */
+	while(1) {
+		recvfrom(sockfd, &przeciwnik, sizeof(przeciwnik), 0, NULL, NULL);
+		while(2) {
+			if(strcmp(ja->komunikat, "Ustawione") == 0) {
+				printf("Propozycja gry przyjeta\n");
+				break;
+			}
+		}
+			
+		strncpy(ja->komunikat, "Tak", 64);
 
+		break;
+	}
+
+	/* Wlasciwa gra */
+	while(8) {
+		recvfrom(sockfd, &sPrzeciwnik, sizeof(sPrzeciwnik), 0, NULL, NULL);
+		if((strcmp(sPrzeciwnik.strzal, "NN") != 0)&&(strcmp(sPrzeciwnik.strzal, "KK") != 0)) {
+			printf("Przeciwnik strzelil: %s\n", sPrzeciwnik.strzal);
+		}
+		else if(strcmp(sPrzeciwnik.strzal, "KK") == 0) {
+			strncpy(ja->komunikat, "Nie", 64);
+			decision = 'z';
+			printf("Przeciwnik zakonczyl gre. Czy chcesz ustawic nowa plansze? (t/n)\n");
+			scanf("%c", &decision);
+			if(decision == 'n') {
+				/* Koniec gry */
+				kill(pid, SIGINT); /* Zabijanie dziecka */
+				exit(0);
+			}
+			else if(decision == 't') {
+				strncpy(ja->komunikat, "Nowa",  64);
+				break; /* Idziemy na koniec funkcji */
+			}
+		}
+			
+		if(sprawdzTrafienie(sPrzeciwnik.strzal, ja) == 1) {
+			strncpy(ja->komunikat, "Skip", 64);
+		}
+		else {
+			strncpy(ja->komunikat, "Tak", 64);
+		}
+	}
+
+	/* Skoro tu doszlismy to jeszcze jedna gra */
+	startServer(ja, przeciwnik);
+}
+
+int main(int argc, char *argv[]) {
 	struct propozycja propMy;
-	struct strzal s, sPrzeciwnik;
 	struct gracz przeciwnik;
 
 	ja = (struct gracz*)malloc(sizeof(struct gracz));
@@ -198,6 +254,7 @@ int main(int argc, char *argv[]) {
 			strcpy(propMy.nick, argv[2]);
 		}
 		
+		strncpy(ja->komunikat, "Nowa", 64);
 		start(ja, argv[1]);
 
 		/* Wlasciwa gra */
@@ -272,48 +329,7 @@ int main(int argc, char *argv[]) {
 		
 		bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)); 
 
-		/* Czekanie na przyjecie propozycji */
-		while(1) {
-			recvfrom(sockfd, &przeciwnik, sizeof(przeciwnik), 0, NULL, NULL);
-			while(2) {
-				if(strcmp(ja->komunikat, "Ustawione") == 0) {
-					printf("Propozycja gry przyjeta\n");
-					break;
-				}
-			}
-			
-			strncpy(ja->komunikat, "Tak", 64);
-
-			break;
-		}
-
-		/* Wlasciwa gra */
-		while(8) {
-			recvfrom(sockfd, &sPrzeciwnik, sizeof(sPrzeciwnik), 0, NULL, NULL);
-			if((strcmp(sPrzeciwnik.strzal, "NN") != 0)&&(strcmp(sPrzeciwnik.strzal, "KK") != 0)) {
-				printf("Przeciwnik strzelil: %s\n", sPrzeciwnik.strzal);
-			}
-			else if(strcmp(sPrzeciwnik.strzal, "KK") == 0) {
-				printf("Przeciwnik zakonczyl gre. Czy chcesz ustawic nowa plansze? (t/n)\n");
-				scanf("%c", &decision);
-				if(decision == 'n') {
-					/* Koniec gry */
-					kill(pid, SIGINT); /* Zabijanie dziecka */
-					exit(0);
-				}
-				else {
-					strncpy(ja->komunikat, "Nowa",  64);
-				}
-			}
-			
-			if(sprawdzTrafienie(sPrzeciwnik.strzal, ja) == 1) {
-				strncpy(ja->komunikat, "Skip", 64);
-			}
-			else {
-				strncpy(ja->komunikat, "Tak", 64);
-			}
-		}
-		printf("Tu start jakby...\n");
+		startServer(ja, przeciwnik);
 		
 		shmdt(ja);
 	}
