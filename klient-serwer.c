@@ -14,6 +14,9 @@
 /* Kod na podstawie przykladu ,,A. Mroz - zad. na SK, do modyfikacji'' */
 /* bez pelnej obslugi bledow! */
 
+int shmid;
+key_t key;
+
 struct my_msg{
     char name[16];
     char text[255];
@@ -27,10 +30,6 @@ struct gracz {
 	char dm2[4];
 	char komunikat[32];
 	short skip;
-};
-
-struct plansza {
-	
 };
 
 struct propozycja {
@@ -82,6 +81,26 @@ void koniecGry(pid_t pid, pid_t ppid) {
 	exit(1);
 }
 
+void endClient() {
+	if(shmctl(shmid, IPC_RMID, 0) != 0) {
+		printf("Problem z usunieciem pamieci dzielonej\n");
+		exit(1);
+	}
+
+	exit(0);
+
+}
+
+void endServer() {
+	if(shmctl(shmid, IPC_RMID, 0) != 0) {
+		printf("Problem z usunieciem pamieci dzielonej\n");
+		exit(1);
+	}
+
+	exit(0);
+
+}
+
 int main(int argc, char *argv[]) {
 	int sockfd;
 	struct sockaddr_in server_addr;
@@ -95,9 +114,6 @@ int main(int argc, char *argv[]) {
 	struct strzal s, sPrzeciwnik;
 	struct gracz *ja = (struct gracz*)malloc(sizeof(struct gracz)), przeciwnik;
 
-	key_t key;
-	int shmid;
-
 	/* Inicjalizacja struktury gracz - ja */
 	/*ja = (struct gracz*)malloc(sizeof(*ja));*/
 
@@ -108,6 +124,9 @@ int main(int argc, char *argv[]) {
 	}
 	else if(pid == 0) {
 		/* PROCES POTOMNY - KLIENT */
+
+		/* Obsluga przerwania */
+		signal(SIGINT, endClient);
 		
 		/* Przygotowanie kolejki komunikatow */
 		if((key = ftok("plik", 'R')) == -1) {
@@ -202,6 +221,7 @@ int main(int argc, char *argv[]) {
 						printf("KONCZE PROGRAM\\n");
 						strncpy(s.strzal, "KK", 3);
 						bytes = sendto(sockfd, &s, sizeof(s), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+						shmdt(ja);
 						kill(getppid(), SIGINT);
 						kill(getpid(), SIGINT);
 						break;
@@ -221,6 +241,9 @@ int main(int argc, char *argv[]) {
 	}
 	else {
 		/* PROCES MACIERZYSTY - SERWER */
+
+		/* Obsluga przerwania */
+		signal(SIGINT, endServer);
 
 		/* Przygotowanie kolejki komunikatow */
 		if((key = ftok("plik", 'R')) == -1) {
@@ -298,6 +321,7 @@ int main(int argc, char *argv[]) {
 				scanf("%c", &decision);
 				if(decision == 'n') {
 					/* Koniec gry */
+					kill(pid, SIGINT); /* Zabijanie dziecka */
 					exit(0);
 				}
 			}
