@@ -185,17 +185,14 @@ int main(int argc, char *argv[]) {
 			exit(1);
 		}
 
-		printf("My PID is: %d\n", getpid());
-
 		/* Wlasciwa gra */
 		while(8) {
-			if((strcmp("Tak", ja->komunikat) == 0)||(strcmp("Skip", ja->komunikat) == 0)) {
 				if(strcmp("Skip", ja->komunikat) == 0) {
 					strncpy(s.strzal, "NN", 3);
 					bytes = sendto(sockfd, &s, sizeof(s), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
 					strncpy(ja->komunikat, "Nie", 64);
 				}
-				else {
+				else if(strcmp("Tak", ja->komunikat) == 0) {
 					printf("Wybierz pole do strzalu: ");
 					fgets(s.strzal, 10, stdin);
 					s.strzal[strlen(s.strzal)-1] = '\0';
@@ -213,12 +210,6 @@ int main(int argc, char *argv[]) {
 						strncpy(ja->komunikat, "Nie", 64);
 					}
 				}
-			}
-			else {
-				while((strcmp("Tak", ja->komunikat) != 0)&&(strcmp("Skip", ja->komunikat) != 0)) {
-					/* Busy waiting - zapobiega problemom przy niegrzecznym zachowaniu */
-				}
-			}
 		}
 
 		shmdt(ja);
