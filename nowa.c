@@ -210,7 +210,7 @@ int main(int argc, char **argv) {
 				printf("Zakonczyles gre\n");
 				strncpy(mojStrzal.strzal, "KK", 4);
 				bytes = sendto(sockfd, &mojStrzal, sizeof(mojStrzal), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-				info->twojaKolejka = 3;
+				kill(getppid(), SIGINT); /* Wysylanie sygnalu do rodzica */
 				break;
 			}
 			else {
