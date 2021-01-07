@@ -200,14 +200,17 @@ int main(int argc, char **argv) {
 				info->twojaKolejka = 0;
 				continue;
 			}
-			fgets(mojStrzal.strzal, 4, stdin);
+			else if(info->twojaKolejka == 3) {
+				break;
+			}
+			fgets(mojStrzal.strzal, 16, stdin);
 			mojStrzal.strzal[strlen(mojStrzal.strzal)-1] = '\0';
 			info->twojaKolejka = 0;
 			if(strcmp(mojStrzal.strzal, "<koniec>") == 0) {
 				printf("Zakonczyles gre\n");
 				strncpy(mojStrzal.strzal, "KK", 4);
 				bytes = sendto(sockfd, &mojStrzal, sizeof(mojStrzal), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-				endServer();
+				info->twojaKolejka = 3;
 				break;
 			}
 			else {
@@ -276,9 +279,17 @@ int main(int argc, char **argv) {
 				}
 				else if(strcmp(strzal.strzal, "KK") == 0) {
 					printf("[%s (%s) zakonczyl gre\n", nickPrzeciwnika, argv[1]);
+					strncpy(mojStrzal.strzal, "MK", 4);
+					bytes = sendto(sockfd, &mojStrzal, sizeof(mojStrzal), 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
+					info->twojaKolejka = 3;
+					break;
+				}
+				else if(strcmp(strzal.strzal, "MK") == 0) {
+					info->twojaKolejka = 3;
 					break;
 				}
 				else {
+					printf("Trafienie: %s\n", strzal.strzal);
 					trafienie = sprawdzTrafienie(strzal.strzal);
 					if(trafienie == 0) {
 						printf("[%s [%s] strzelil: %s - pudlo. Podaj pole do strzalu]", nickPrzeciwnika, argv[1], strzal.strzal);
@@ -296,6 +307,8 @@ int main(int argc, char **argv) {
 			}
 			printf("\n");
 		}
+
+		endServer();
 	}
 	
 	return 0;
