@@ -23,10 +23,14 @@ struct Gracz {
 struct Info {
 	short twojaKolejka;
 	short okretyUstawione;
+	char jm1[4];
+	char jm2[4];
+	char dm1[4];
+	char dm2[4];
 };
 
 struct Strzal {
-	char strzal[4];
+	char strzal[16];
 };
 
 /* Zmienne */
@@ -39,12 +43,14 @@ ssize_t bytes;
 struct Gracz *ja;
 int my_port = 6767;
 char tmp[10];
+char nickPrzeciwnika[16];
 
 struct Strzal strzal, mojStrzal;
 char decision;
 int pid;
-short first = 1;
+short first = 1, trafienie, zatopioneStatki = 0;
 struct Info *info;
+short jm1Zatopiony = 0, jm2Zatopiony = 0, dm1Zatopiony = 0, dm2Zatopiony = 0;
 
 /* End */
 void endClient() {
@@ -63,6 +69,33 @@ void endServer() {
 	}
 	printf("Koncze\n");
 	exit(0);
+}
+
+/* Sprawdzanie trafienia */
+short sprawdzTrafienie(char strzal[]) {
+	if(strcmp(strzal, info->jm1) == 0) {
+		if(jm1Zatopiony == 0) zatopioneStatki++;
+		jm1Zatopiony = 1;
+		return 1;
+	}
+	else if(strcmp(strzal, info->jm2) == 0) {
+		if(jm2Zatopiony == 0) zatopioneStatki++;
+		jm2Zatopiony = 1;
+		return 1;
+	}
+	else if(strcmp(strzal, info->dm1) == 0) {
+		if(dm1Zatopiony == 0) zatopioneStatki++;
+		dm1Zatopiony = 1;
+		return 2;
+	}
+	else if(strcmp(strzal, info->dm2) == 0) {
+		if(dm2Zatopiony == 0) zatopioneStatki++;
+		dm2Zatopiony = 1;
+		return 2;
+	}
+	else {
+		return 0;
+	}
 }
 
 /* Program */
@@ -140,13 +173,23 @@ int main(int argc, char **argv) {
 		printf("Polozenie Twoich okretow:\nJednomasztowiecA: %s\nJednomasztowiecB: %s\nDwumasztowiec: %s %s\n", ja->jm1, ja->jm2, ja->dm1, ja->dm2);
 		info->okretyUstawione = 1;
 		
-		/* Wyslanie pierwszego strzalu - zaproszenia */
-		strncpy(mojStrzal.strzal, "SS", 4);
+		/* Kopiowanie danych do struktury info */
+		strncpy(info->jm1, ja->jm1, 4);
+
+		/* Wyslanie pierwszego strzalu - zaproszenia, w pierwszym strzale wysylamy swoj nick */
+		strncpy(mojStrzal.strzal, ja->nick, 16);
 		bytes = sendto(sockfd, &mojStrzal, sizeof(mojStrzal), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
 		
 		/* Nasluchiwanie na wpisanie strzalu */
 		while(8) {
-			if(info->twojaKolejka == 0) continue; 
+			if(info->twojaKolejka == 0) continue;
+			if(info->twojaKolejka == -1) {
+				/* Pusty strzal */
+				strncpy(mojStrzal.strzal, "AA", 4);
+				bytes = sendto(sockfd, &mojStrzal, sizeof(mojStrzal), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+				info->twojaKolejka = 0;
+				continue;
+			}
 			fgets(mojStrzal.strzal, 4, stdin);
 			mojStrzal.strzal[strlen(mojStrzal.strzal)-1] = '\0';
 			info->twojaKolejka = 0;
@@ -193,21 +236,36 @@ int main(int argc, char **argv) {
 			recvfrom(sockfd, &strzal, sizeof(strzal), 0, NULL, NULL);
 			if(first == 1) {
 				/* Pierwszy strzal - zaproszenie do gry */
-				printf("Przeciwnik dolaczyl do gry\n");
+				printf("[%s [%s] dolaczyl do gry", strzal.strzal, argv[1]);
+				strncpy(nickPrzeciwnika, strzal.strzal, 16);
 				first = 0;
-				if(info->okretyUstawione == 0) {
-					printf("Jestes drugi w kolejce\n");
-				}
-				else {
-					printf("Jestes pierwszy w kolejce\n");
+				if(info->okretyUstawione != 0) {
+					printf(", podaj pole do strzalu]\n");
 					info->twojaKolejka = 1;
 				}
 			}
 			else {
-				printf("Przeciwnik strzelil: %s, Oddaj swoj strzal:", strzal.strzal);
-				info->twojaKolejka = 1;
+				if(strcmp(strzal.strzal, "AA") == 0) {
+					printf("[%s (%s): trafiles moj okret! Podaj kolejne pole do strzalu[", nickPrzeciwnika, argv[1]);
+					info->twojaKolejka = 1;
+				}
+				else {
+					trafienie = sprawdzTrafienie(strzal.strzal);
+					if(trafienie == 0) {
+						printf("[%s [%s] strzelil: %s - pudlo. Podaj pole do strzalu]", nickPrzeciwnika, argv[1], strzal.strzal);
+						info->twojaKolejka = 1;
+					}
+					else if(trafienie == 1) {
+						printf("[%s [%s] strzelil %s - trafiony jednomasztowiec]", nickPrzeciwnika, argv[1], strzal.strzal);
+						info->twojaKolejka = -1;
+					}
+					else if(trafienie == 2) {
+						printf("[%s [%s] strzelil %s - trafiony dwumasztowiec]", nickPrzeciwnika, argv[1], strzal.strzal);
+						info->twojaKolejka = -1;
+					}
+				}
 			}
-			printf("---\n");
+			printf("\n");
 		}
 	}
 	
