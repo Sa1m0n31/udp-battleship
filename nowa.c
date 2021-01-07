@@ -150,6 +150,7 @@ int main(int argc, char **argv) {
 			fgets(mojStrzal.strzal, 4, stdin);
 			mojStrzal.strzal[strlen(mojStrzal.strzal)-1] = '\0';
 			info->twojaKolejka = 0;
+			bytes = sendto(sockfd, &mojStrzal, sizeof(mojStrzal), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
 		}
 		
 	}
@@ -206,6 +207,7 @@ int main(int argc, char **argv) {
 				printf("Przeciwnik strzelil: %s, Oddaj swoj strzal:", strzal.strzal);
 				info->twojaKolejka = 1;
 			}
+			printf("---\n");
 		}
 	}
 	
