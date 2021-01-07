@@ -175,6 +175,9 @@ int main(int argc, char **argv) {
 		
 		/* Kopiowanie danych do struktury info */
 		strncpy(info->jm1, ja->jm1, 4);
+		strncpy(info->jm2, ja->jm2, 4);
+		strncpy(info->dm1, ja->dm1, 4);
+		strncpy(info->dm2, ja->dm2, 4);
 
 		/* Wyslanie pierwszego strzalu - zaproszenia, w pierwszym strzale wysylamy swoj nick */
 		strncpy(mojStrzal.strzal, ja->nick, 16);
@@ -184,8 +187,15 @@ int main(int argc, char **argv) {
 		while(8) {
 			if(info->twojaKolejka == 0) continue;
 			if(info->twojaKolejka == -1) {
-				/* Pusty strzal */
-				strncpy(mojStrzal.strzal, "AA", 4);
+				/* Trafiony dwumasztowiec - pusty strzal */
+				strncpy(mojStrzal.strzal, "Z1", 4);
+				bytes = sendto(sockfd, &mojStrzal, sizeof(mojStrzal), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+				info->twojaKolejka = 0;
+				continue;
+			}
+			else if(info->twojaKolejka == -2) {
+				/* Trafiony dwumasztowiec - pusty strzal */
+				strncpy(mojStrzal.strzal, "Z2", 4);
 				bytes = sendto(sockfd, &mojStrzal, sizeof(mojStrzal), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
 				info->twojaKolejka = 0;
 				continue;
@@ -193,8 +203,19 @@ int main(int argc, char **argv) {
 			fgets(mojStrzal.strzal, 4, stdin);
 			mojStrzal.strzal[strlen(mojStrzal.strzal)-1] = '\0';
 			info->twojaKolejka = 0;
-			bytes = sendto(sockfd, &mojStrzal, sizeof(mojStrzal), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+			if(strcmp(mojStrzal.strzal, "<koniec>") == 0) {
+				printf("Zakonczyles gre\n");
+				strncpy(mojStrzal.strzal, "KK", 4);
+				bytes = sendto(sockfd, &mojStrzal, sizeof(mojStrzal), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+				endServer();
+				break;
+			}
+			else {
+				bytes = sendto(sockfd, &mojStrzal, sizeof(mojStrzal), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+			}
 		}
+
+		endClient();
 		
 	}
 	else {
@@ -245,9 +266,17 @@ int main(int argc, char **argv) {
 				}
 			}
 			else {
-				if(strcmp(strzal.strzal, "AA") == 0) {
-					printf("[%s (%s): trafiles moj okret! Podaj kolejne pole do strzalu[", nickPrzeciwnika, argv[1]);
+				if(strcmp(strzal.strzal, "Z1") == 0) {
+					printf("[%s (%s): trafiles jednomasztowiec! Podaj kolejne pole do strzalu]", nickPrzeciwnika, argv[1]);
 					info->twojaKolejka = 1;
+				}
+				else if(strcmp(strzal.strzal, "Z2") == 0) {
+					printf("[%s (%s): trafiles dwumasztowiec! Podaj kolejne pole do strzalu]", nickPrzeciwnika, argv[1]);
+					info->twojaKolejka = 1;
+				}
+				else if(strcmp(strzal.strzal, "KK") == 0) {
+					printf("[%s (%s) zakonczyl gre\n", nickPrzeciwnika, argv[1]);
+					break;
 				}
 				else {
 					trafienie = sprawdzTrafienie(strzal.strzal);
@@ -261,7 +290,7 @@ int main(int argc, char **argv) {
 					}
 					else if(trafienie == 2) {
 						printf("[%s [%s] strzelil %s - trafiony dwumasztowiec]", nickPrzeciwnika, argv[1], strzal.strzal);
-						info->twojaKolejka = -1;
+						info->twojaKolejka = -2;
 					}
 				}
 			}
