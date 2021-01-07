@@ -21,12 +21,13 @@ int sockfd;
 struct sockaddr_in server_addr;
 ssize_t bytes;
 struct gracz *ja;
+struct gracz *przeciwnik;
 int my_port = 6767;
 char tmp[10];
 
 struct strzal s, sPrzeciwnik;
 char decision;
-int pid;
+int pid, pid2;
 
 struct my_msg{
     char name[16];
@@ -189,17 +190,22 @@ void start(struct gracz *ja, char *host) {
 
 }
 
-void startServer(struct gracz *ja, struct gracz przeciwnik) {
+void startServer(struct gracz *ja, struct gracz *przeciwnik) {
 	/* Czekanie na przyjecie propozycji */
 	while(1) {
 		recvfrom(sockfd, &przeciwnik, sizeof(przeciwnik), 0, NULL, NULL);
+
+		/* Skoro dostalismy info o przyjeciu to wysylamy je */
+		bytes = sendto(sockfd, &ja, sizeof(ja), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
 		while(2) {
 			if(strcmp(ja->komunikat, "Ustawione") == 0) {
 				printf("Propozycja gry przyjeta\n");
 				break;
 			}
 		}
-			
+		
+
+		printf("Przeciwnik: %s, %s, %s\n", przeciwnik->jm1, przeciwnik->nick, przeciwnik->dm1);
 		strncpy(ja->komunikat, "Tak", 64);
 
 		break;
@@ -240,10 +246,9 @@ void startServer(struct gracz *ja, struct gracz przeciwnik) {
 }
 
 int main(int argc, char *argv[]) {
-	struct propozycja propMy;
-	struct gracz przeciwnik;
 
 	ja = (struct gracz*)malloc(sizeof(struct gracz));
+	przeciwnik = (struct gracz*)malloc(sizeof(struct gracz));
 
 	/* Inicjalizacja struktury gracz - ja */
 	/*ja = (struct gracz*)malloc(sizeof(*ja));*/
@@ -284,12 +289,10 @@ int main(int argc, char *argv[]) {
 		else if(argc == 2) {
 			/* Nie podano nicku - ustawienie domyslnego nicku */
 			strcpy(ja->nick, "NN");
-			strcpy(propMy.nick, "NN");
 		}
 		else {
 			/* Podano nick - ustawienie nicku podanego jako drugi argument */
 			strcpy(ja->nick, argv[2]);
-			strcpy(propMy.nick, argv[2]);
 		}
 		
 		strncpy(ja->komunikat, "Nowa", 64);
