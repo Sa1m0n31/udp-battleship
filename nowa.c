@@ -48,7 +48,7 @@ char nickPrzeciwnika[16];
 struct Strzal strzal, mojStrzal;
 char decision;
 int pid;
-short first = 1, trafienie, zatopioneStatki = 0;
+short first = 1, trafienie, zatopioneStatki = 0, trafioneStatki = 0;
 struct Info *info;
 short jm1Zatopiony = 0, jm2Zatopiony = 0, dm1Zatopiony = 0, dm2Zatopiony = 0;
 
@@ -271,19 +271,29 @@ int main(int argc, char **argv) {
 				if(strcmp(strzal.strzal, "Z1") == 0) {
 					printf("[%s (%s): trafiles jednomasztowiec! Podaj kolejne pole do strzalu]", nickPrzeciwnika, argv[1]);
 					info->twojaKolejka = 1;
+					trafioneStatki++;
+					printf("trafionestatki = %d\n", trafioneStatki);
+					if(trafioneStatki == 4) {
+						printf("Wygrales!\n");
+						info->twojaKolejka = 3;
+						break;
+					}
 				}
 				else if(strcmp(strzal.strzal, "Z2") == 0) {
 					printf("[%s (%s): trafiles dwumasztowiec! Podaj kolejne pole do strzalu]", nickPrzeciwnika, argv[1]);
 					info->twojaKolejka = 1;
+					trafioneStatki++;
+					printf("Trafionestatki = %d\n", trafioneStatki);
+					if(trafioneStatki == 4) {
+						printf("Wygranes!\n");
+						info->twojaKolejka = 3;
+						break;
+					}
 				}
 				else if(strcmp(strzal.strzal, "KK") == 0) {
 					printf("[%s (%s) zakonczyl gre\n", nickPrzeciwnika, argv[1]);
 					strncpy(mojStrzal.strzal, "MK", 4);
 					bytes = sendto(sockfd, &mojStrzal, sizeof(mojStrzal), 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
-					info->twojaKolejka = 3;
-					break;
-				}
-				else if(strcmp(strzal.strzal, "MK") == 0) {
 					info->twojaKolejka = 3;
 					break;
 				}
@@ -294,28 +304,29 @@ int main(int argc, char **argv) {
 				}
 				else {
 					trafienie = sprawdzTrafienie(strzal.strzal);
-					
-					if(zatopioneStatki == 4) {
+
+					if(zatopioneStatki != 4) {
+						if(trafienie == 0) {
+							printf("[%s [%s] strzelil: %s - pudlo. Podaj pole do strzalu]", nickPrzeciwnika, argv[1], strzal.strzal);
+							info->twojaKolejka = 1;
+						}
+						else if(trafienie == 1) {
+							printf("[%s [%s] strzelil %s - trafiony jednomasztowiec]", nickPrzeciwnika, argv[1], strzal.strzal);
+							info->twojaKolejka = -1;
+						}
+						else if(trafienie == 2) {
+							printf("[%s [%s] strzelil %s - trafiony dwumasztowiec]", nickPrzeciwnika, argv[1], strzal.strzal);
+							info->twojaKolejka = -2;
+						}
+					}
+					else {
 						printf("PRZEGRALES\n");
-						strncpy(mojStrzal.strzal, "WW", 4);
+						strncpy(mojStrzal.strzal, "KK", 4);
 						bytes = sendto(sockfd, &mojStrzal, sizeof(mojStrzal), 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
 						info->twojaKolejka = 3;
 						break;
 					}
 
-
-					if(trafienie == 0) {
-						printf("[%s [%s] strzelil: %s - pudlo. Podaj pole do strzalu]", nickPrzeciwnika, argv[1], strzal.strzal);
-						info->twojaKolejka = 1;
-					}
-					else if(trafienie == 1) {
-						printf("[%s [%s] strzelil %s - trafiony jednomasztowiec]", nickPrzeciwnika, argv[1], strzal.strzal);
-						info->twojaKolejka = -1;
-					}
-					else if(trafienie == 2) {
-						printf("[%s [%s] strzelil %s - trafiony dwumasztowiec]", nickPrzeciwnika, argv[1], strzal.strzal);
-						info->twojaKolejka = -2;
-					}
 				}
 			}
 			printf("\n");
