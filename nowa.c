@@ -260,11 +260,10 @@ int main(int argc, char **argv) {
 			recvfrom(sockfd, &strzal, sizeof(strzal), 0, NULL, NULL);
 			if(first == 1) {
 				/* Pierwszy strzal - zaproszenie do gry */
-				printf("[%s [%s] dolaczyl do gry", strzal.strzal, argv[1]);
 				strncpy(nickPrzeciwnika, strzal.strzal, 16);
 				first = 0;
 				if(info->okretyUstawione != 0) {
-					printf(", podaj pole do strzalu]\n");
+					printf("[%s [%s] dolaczyl do gry, podaj pole do strzalu]", strzal.strzal, argv[1]);
 					info->twojaKolejka = 1;
 				}
 			}
@@ -288,9 +287,23 @@ int main(int argc, char **argv) {
 					info->twojaKolejka = 3;
 					break;
 				}
+				else if(strcmp(strzal.strzal, "WW") == 0) {
+					printf("WYGRALES!\n");
+					info->twojaKolejka = 3;
+					break;
+				}
 				else {
-					printf("Trafienie: %s\n", strzal.strzal);
 					trafienie = sprawdzTrafienie(strzal.strzal);
+					
+					if(zatopioneStatki == 4) {
+						printf("PRZEGRALES\n");
+						strncpy(mojStrzal.strzal, "WW", 4);
+						bytes = sendto(sockfd, &mojStrzal, sizeof(mojStrzal), 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
+						info->twojaKolejka = 3;
+						break;
+					}
+
+
 					if(trafienie == 0) {
 						printf("[%s [%s] strzelil: %s - pudlo. Podaj pole do strzalu]", nickPrzeciwnika, argv[1], strzal.strzal);
 						info->twojaKolejka = 1;
