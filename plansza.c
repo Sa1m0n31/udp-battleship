@@ -1,3 +1,6 @@
+#define _XOPEN_SOURCE 600
+
+#include<sys/shm.h>
 #include<sys/types.h>
 #include<sys/socket.h>
 #include<stdio.h>
@@ -7,11 +10,9 @@
 #include<unistd.h>
 #include<signal.h>
 #include<string.h>
-
+#include<netdb.h>
 #include<sys/ipc.h>
 #include<sys/shm.h>
-
-#include<netdb.h>
 
 /* Struktury */
 struct Gracz {
