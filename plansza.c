@@ -135,10 +135,13 @@ void odnotujStrzal(char *strzal, short trafiony) {
 	else if(strcmp(strzal, "d4") == 0) n =15;
 
 	if(trafiony == 0) info->plansza[n] = 'X';
-	else info->plansza[n] = 'Z';
+	else {
+		info->plansza[n] = 'Z';
+		trafioneStatki++;
+	}
 }
 
-void startClient() {
+void startClient(char *host) {
 	/* Zerowanie planszy */
 	int i;
 	for(i=0; i<16; i++) {
@@ -169,6 +172,7 @@ void startClient() {
 	/* Wyslanie pierwszego strzalu - zaproszenia, w pierwszym strzale wysylamy swoj nick */
 	strncpy(mojStrzal.strzal, ja->nick, 16);
 	bytes = sendto(sockfd, &mojStrzal, sizeof(mojStrzal), 0, NULL, 0);
+	printf("[Wyslano propozycje gry do %s]\n", host);
 }
 
 void wypiszPlansze() {
@@ -264,7 +268,7 @@ int main(int argc, char **argv) {
         }
 		
 		/* Ustawienie okretow i wyslanie zaproszenia do przeciwnika */
-		startClient();
+		startClient(argv[1]);
 		
 		/* Nasluchiwanie na wpisanie strzalu */
 		while(8) {
@@ -283,14 +287,17 @@ int main(int argc, char **argv) {
 				info->twojaKolejka = 0;
 				continue;
 			}
-			else if(info->twojaKolejka == 3) {
-				/* Twoj przeciwnik zakonczyl gre */
-				printf("Twoj przeciwnik zakonczyl gre. Ustawic nowa plansze? (t/n)\n");
+			else if((info->twojaKolejka == 3)||(info->twojaKolejka == 4)) {
+				/* 3 - woj przeciwnik zakonczyl gre */
+				if(info->twojaKolejka == 3) printf("[Twoj przeciwnik zakonczyl gre. Ustawic nowa plansze? (t/n)]\n");
+				/* 4 - przegrales */
+				if(info->twojaKolejka == 4) printf("[Przegrales. Ustawic nowa plansze? (t/n)]\n");
+
 				scanf("%c", &decision);
 				info->decision = decision;
 				if(decision == 't') {
 					info->twojaKolejka = 0;
-					startClient();
+					startClient(argv[1]);
 					continue;
 				}
 				else {
@@ -301,6 +308,11 @@ int main(int argc, char **argv) {
 			else if(info->twojaKolejka == 2) {
 				/* Trafiles przeciwnika - masz kolejny strzal */
 				odnotujStrzal(mojStrzal.strzal, 1); /* Zapisz poprzedni strzal jako trafiony */
+				printf("Trafione strzaly: %d\n", trafioneStatki);
+				if(trafioneStatki == 4) {
+					printf("Wygrales!\n");
+					break;
+				}
 			}
 			fgets(mojStrzal.strzal, 16, stdin);
 			mojStrzal.strzal[strlen(mojStrzal.strzal)-1] = '\0';
@@ -387,6 +399,7 @@ int main(int argc, char **argv) {
 		/* Nasluchiwanie na strzaly */
 		while(8) {
 			if(first == 1) printf("Rozpoczynam nasluchiwanie na zaproszenie przeciwnika\n");
+			printf("---Czekam na strzal---\n");
 			recvfrom(sockfd, &strzal, sizeof(strzal), 0, NULL, NULL);
 			if(first == 1) {
 				/* Pierwszy strzal - zaproszenie do gry */
@@ -398,10 +411,10 @@ int main(int argc, char **argv) {
 				}
 			}
 			else {
+				/* Normalna gra */
 				if(strcmp(strzal.strzal, "Z1") == 0) {
 					printf("[%s (%s): trafiles jednomasztowiec! Podaj kolejne pole do strzalu]", nickPrzeciwnika, argv[1]);
 					info->twojaKolejka = 2;
-					trafioneStatki++;
 					if(trafioneStatki == 4) {
 						printf("Wygrales!\n");
 						info->twojaKolejka = 3;
@@ -411,8 +424,6 @@ int main(int argc, char **argv) {
 				else if(strcmp(strzal.strzal, "Z2") == 0) {
 					printf("[%s (%s): trafiles dwumasztowiec! Podaj kolejne pole do strzalu]", nickPrzeciwnika, argv[1]);
 					info->twojaKolejka = 2;
-					trafioneStatki++;
-					printf("Trafionestatki = %d\n", trafioneStatki);
 					if(trafioneStatki == 4) {
 						printf("Wygranes!\n");
 						info->twojaKolejka = 3;
@@ -425,6 +436,7 @@ int main(int argc, char **argv) {
 					bytes = sendto(sockfd, &mojStrzal, sizeof(mojStrzal), 0, NULL, 0);
 					info->twojaKolejka = 3;
 					
+					/* Czekamy na decyzje - konczymy czy gramy dalej */
 					while(7) {
 						if(info->decision == 't') {
 							first = 1;
@@ -438,6 +450,7 @@ int main(int argc, char **argv) {
 					}
 					if(end == 0) continue;
 					else break;
+
 				}
 				else if(strcmp(strzal.strzal, "WW") == 0) {
 					printf("WYGRALES!\n");
@@ -445,6 +458,7 @@ int main(int argc, char **argv) {
 					break;
 				}
 				else {
+					/* Normalny strzal przeciwnika */
 					trafienie = sprawdzTrafienie(strzal.strzal);
 
 					if(zatopioneStatki != 4) {
@@ -462,11 +476,26 @@ int main(int argc, char **argv) {
 						}
 					}
 					else {
-						printf("PRZEGRALES\n");
-						strncpy(mojStrzal.strzal, "Z1", 4);
-						bytes = sendto(sockfd, &mojStrzal, sizeof(mojStrzal), 0, NULL, 0);
-						info->twojaKolejka = 3;
-						break;
+						/* zatopioneStatki = 4 ---> przegrales */
+						strncpy(strzal.strzal, "WW", 4);
+						bytes = sendto(sockfd, &strzal, sizeof(strzal), 0, NULL, 0);
+						info->twojaKolejka = 4;
+						
+						/* Czekamy na decyzje - konczymy czy gramy dalej */
+						while(7) {
+							if(info->decision == 't') {
+								first = 1;
+								end = 0;
+								break;
+							}
+							else if(info->decision == 'n') {
+								end = 1;
+								break;
+							}
+						}
+						if(end == 0) continue;
+						else break;
+
 					}
 
 				}
